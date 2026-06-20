@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能刷题系统 (万能解析版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: "Microsoft YaHei", sans-serif; margin: 0; padding: 0; padding-bottom: 80px; background: #f4f6f8; color: #333; }
+        .header { background: #fff; padding: 15px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 100; }
+        .header h2 { margin: 0; font-size: 18px; }
+        .stats { margin-left: auto; font-size: 14px; color: #666; font-weight: bold; }
+        .stats span { color: #007bff; }
+        .btn { padding: 6px 12px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        .btn:hover { background: #f0f0f0; }
+        .main-content { max-width: 800px; margin: 20px auto; padding: 25px; background: #fff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .question-meta { font-size: 14px; color: #888; margin-bottom: 10px; }
+        .badge { background: #e9ecef; padding: 2px 8px; border-radius: 4px; margin-right: 10px; font-size: 12px; }
+        .badge.multi { background: #fff3cd; color: #856404; }
+        .question-text { font-size: 18px; line-height: 1.6; margin-bottom: 20px; font-weight: bold; }
+        .options { display: flex; flex-direction: column; gap: 12px; }
+        .option { padding: 15px; border: 2px solid #e0e0e0; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 16px; display: flex; align-items: center; user-select: none; }
+        .option:hover { border-color: #007bff; background: #f8f9fa; }
+        .option.selected { border-color: #007bff; background: #e7f1ff; font-weight: bold; }
+        .option.correct { border-color: #28a745; background: #d4edda; }
+        .option.wrong { border-color: #dc3545; background: #f8d7da; }
+        .option-label { font-weight: bold; margin-right: 10px; width: 25px; color: #666; }
+        .analysis-box { margin-top: 20px; padding: 15px; background: #e2e3e5; border-radius: 6px; display: none; }
+        .analysis-box.show { display: block; }
+        .analysis-box h4 { margin-top: 0; color: #495057; }
+        .shortcuts-hint { font-size: 12px; color: #999; text-align: center; margin-top: 20px; border-top: 1px dashed #eee; padding-top: 10px; }
+        
+        /* 固定底部导航栏 */
+        .nav-bar { position: fixed; bottom: 0; left: 0; width: 100%; height: 60px; background: #fff; border-top: 1px solid #ddd; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 1000; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); box-sizing: border-box; padding: 0 10px; }
+        .nav-bar button { padding: 8px 15px; font-size: 14px; cursor: pointer; border: 1px solid #ccc; background: #f8f9fa; border-radius: 4px; white-space: nowrap; }
+        .nav-bar button:hover { background: #e2e6ea; }
+        
+        /* 模态框 */
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: #fff; padding: 25px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; position: relative; }
+        .close-btn { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #666; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(45px, 1fr)); gap: 10px; margin-top: 20px; }
+        .grid-item { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .grid-item.current { background: #007bff; color: #fff; border-color: #007bff; }
+        .grid-item.answered { background: #c8e6c9; border-color: #28a745; }
+        .grid-item.wrong-item { background: #ffcdd2; border-color: #dc3545; }
+        .history-item { border-bottom: 1px dashed #ccc; padding: 15px 0; }
+        .history-item:last-child { border-bottom: none; }
+        .history-q { font-weight: bold; margin-bottom: 10px; }
+        .correct-ans { color: #28a745; font-weight: bold; }
+        .wrong-ans { color: #dc3545; text-decoration: line-through; }
+
+        /* 答题完成界面 */
+        #completionScreen { text-align: center; padding: 40px 20px; display: none; }
+        #completionScreen h2 { font-size: 28px; color: #28a745; margin-bottom: 20px; }
+        #completionScreen .stats-box { font-size: 18px; margin: 20px 0; line-height: 2; background: #f8f9fa; padding: 20px; border-radius: 8px; display: inline-block; }
+
+        /* Toast 提示 */
+        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 6px; color: #fff; font-size: 14px; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #28a745; }
+        .toast.error { background: #dc3545; }
+        .toast.info { background: #17a2b8; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>智能刷题系统 (万能解析版)</h2>
+        <select id="historySelect" class="btn"><option>-- 请选择题库 --</option></select>
+        <label class="btn">📂 上传 <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" hidden></label>
+        <button id="clearBtn" class="btn">🗑️ 清空</button>
+        <span class="stats">进度: <span id="progress">0/0</span> | 对: <span id="correct">0</span> | 错: <span id="wrong">0</span></span>
+    </div>
+
+    <div class="main-content" id="mainContent">
+        <div id="quizArea" style="display:none;">
+            <div class="question-meta" id="questionMeta"></div>
+            <div id="questionText" class="question-text"></div>
+            <div id="options" class="options"></div>
+            <div class="analysis-box" id="analysisBox"><h4>💡 解析：</h4><div id="analysisText"></div></div>
+            <div class="shortcuts-hint">⌨️ 快捷键: A/B/C/D 选择 | Enter 确定 | ←/→ 翻页 | S 答题卡 | H 错题 | Esc 关闭</div>
+        </div>
+        
+        <div id="placeholder" style="text-align: center; padding: 50px 20px; color: #666;">
+            <h1 style="color: #333;">智能刷题系统 (万能解析版)</h1>
+            <p>支持上传任意排版的 Excel 题库（自动寻找表头、兼容长表/宽表/合并单元格）</p>
+        </div>
+
+        <div id="completionScreen">
+            <h2>🎉 答题完成！</h2>
+            <div class="stats-box">
+                总题数: <span id="finalTotal"></span><br>
+                正确: <span id="finalCorrect" style="color: #28a745;"></span><br>
+                错误: <span id="finalWrong" style="color: #dc3545;"></span>
+            </div><br>
+            <button class="btn" style="padding: 12px 25px; font-size: 16px; margin: 10px;" onclick="showIncorrectHistory()">查看错题历史</button>
+            <button class="btn" style="padding: 12px 25px; font-size: 16px; margin: 10px;" onclick="restartQuiz()">重新开始</button>
+        </div>
+    </div>
+
+    <div class="modal" id="sheetModal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModals()">✕</span>
+            <h2 style="margin-top: 0;">📝 答题卡</h2>
+            <div class="grid" id="sheetGrid"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="historyModal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModals()">✕</span>
+            <h2 style="margin-top: 0;">❌ 错题历史</h2>
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <button onclick="toggleAnswerSheet()" title="快捷键: S">📝 答题卡</button>
+        <button onclick="prevQuestion()" title="快捷键: ←">⬅ 上一题</button>
+        <button onclick="confirmAnswer()" title="快捷键: Enter">✔ 确定答案</button>
+        <button onclick="nextQuestion()" title="快捷键: →">下一题 ➡</button>
+        <button onclick="showIncorrectHistory()" title="快捷键: H">📝 错题历史</button>
+        <button onclick="closeModals()" title="快捷键: Esc">✕</button>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let questions = [], currentIndex = 0, userAnswers = [], confirmed = [], incorrectHistory = [];
+        let correctCount = 0, incorrectCount = 0, isCompleted = false;
+
+        const fileInput = document.getElementById('fileInput');
+        const historySelect = document.getElementById('historySelect');
+        const clearBtn = document.getElementById('clearBtn');
+        const progressEl = document.getElementById('progress');
+        const correctEl = document.getElementById('correct');
+        const wrongEl = document.getElementById('wrong');
+        const quizArea = document.getElementById('quizArea');
+        const placeholder = document.getElementById('placeholder');
+        const completionScreen = document.getElementById('completionScreen');
+        const questionMeta = document.getElementById('questionMeta');
+        const questionText = document.getElementById('questionText');
+        const optionsEl = document.getElementById('options');
+        const analysisBox = document.getElementById('analysisBox');
+        const analysisText = document.getElementById('analysisText');
+
+        // Toast 提示
+        function showToast(msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        fileInput.addEventListener('change', handleFile);
+        clearBtn.addEventListener('click', () => {
+            questions = []; resetState();
+            placeholder.style.display = 'block';
+            quizArea.style.display = 'none';
+            completionScreen.style.display = 'none';
+        });
+
+        // ==========================================
+        // 核心：万能 Excel 解析引擎 (解决不显示的核心)
+        // ==========================================
+        function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            showToast("正在解析文件，请稍候...", "info");
+            
+            const reader = new FileReader();
+            // 使用 ArrayBuffer 更稳定，解决大文件和部分浏览器兼容问题
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    questions = parseExcel(workbook);
+                    
+                    if (questions.length > 0) {
+                        localStorage.setItem('quiz_' + file.name, JSON.stringify(questions));
+                        updateHistorySelect();
+                        resetState();
+                        renderQuestion();
+                        showToast(`🎉 成功解析 ${questions.length} 道题目！`, "success");
+                    } else {
+                        showToast("⚠️ 未解析到有效题目，请检查Excel格式", "error");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast("❌ 文件解析失败: " + err.message, "error");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function parseExcel(workbook) {
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            // 获取纯二维数组，保留所有空单元格，完美解决合并单元格问题
+            const rawMatrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+            if (!rawMatrix || rawMatrix.length === 0) return [];
+
+            // 1. 智能寻找表头行 (扫描前 20 行，寻找包含“题”和“答/选项”的行)
+            let headerIdx = -1, headers = [];
+            for (let i = 0; i < Math.min(20, rawMatrix.length); i++) {
+                const rowStr = rawMatrix[i].join('|').toLowerCase();
+                if ((rowStr.includes('题') || rowStr.includes('问题')) && 
+                    (rowStr.includes('答') || rowStr.includes('选项'))) {
+                    headerIdx = i;
+                    headers = rawMatrix[i].map(h => String(h).trim());
+                    break;
+                }
+            }
+            if (headerIdx === -1) {
+                for (let i = 0; i < rawMatrix.length; i++) {
+                    if (rawMatrix[i].some(cell => String(cell).trim() !== "")) {
+                        headerIdx = i; headers = rawMatrix[i].map(h => String(h).trim()); break;
+                    }
+                }
+            }
+            if (headerIdx === -1) return [];
+
+            // 2. 智能映射列索引 (启发式猜测)
+            let cols = { q: -1, ans: -1, ana: -1, type: -1, optWide: [], optLabel: -1, optText: -1 };
+            headers.forEach((h, i) => {
+                let hLow = h.toLowerCase();
+                if (cols.q === -1 && /(题干|题目|试题|问题|内容)/.test(hLow) && !/(答案|解析|选项)/.test(hLow)) cols.q = i;
+                else if (cols.ans === -1 && /(答案|正确答案|标准答案)/.test(hLow)) cols.ans = i;
+                else if (cols.ana === -1 && /(解析|解释|说明|分析)/.test(hLow)) cols.ana = i;
+                else if (cols.type === -1 && /(题型|类型|试题类型)/.test(hLow)) cols.type = i;
+                else if (/^(选项\s*[a-e]|[a-e][\.、\s])$/.test(hLow) || /^[a-e]$/.test(hLow)) cols.optWide.push(i);
+                else if (/(选项标识|选项编号|标识)/.test(hLow)) cols.optLabel = i;
+                else if (/(选项内容|选项文本|选项)/.test(hLow) && cols.optText === -1) cols.optText = i;
+            });
+
+            // 兜底策略
+            if (cols.q === -1) cols.q = 0;
+            if (cols.ans === -1) {
+                for(let i=0; i<headers.length; i++) {
+                    if(i !== cols.q && /^[A-D]$/.test(String(rawMatrix[headerIdx+1][i]).trim().toUpperCase())) {
+                        cols.ans = i; break;
+                    }
+                }
+            }
+
+            // 3. 解析数据 (兼容长表和宽表)
+            const dataRows = rawMatrix.slice(headerIdx + 1);
+            let parsed = [];
+            const isLong = cols.optLabel !== -1 && cols.optText !== -1;
+            const isWide = cols.optWide.length > 0;
+
+            if (isLong) {
+                let cur = null;
+                dataRows.forEach(row => {
+                    let q = String(row[cols.q] || "").trim();
+                    let ans = String(row[cols.ans] || "").trim();
+                    let lbl = String(row[cols.optLabel] || "").trim().toUpperCase();
+                    let txt = String(row[cols.optText] || "").trim();
+                    
+                    // 处理合并单元格导致的空题干
+                    if (!q && cur) {
+                        if (lbl && txt) cur.opts[lbl] = txt;
+                    } else if (q) {
+                        if (cur) parsed.push(cur);
+                        cur = {
+                            q: q, ans: ans,
+                            ana: cols.ana !== -1 ? String(row[cols.ana] || "").trim() : "",
+                            type: cols.type !== -1 ? String(row[cols.type] || "").trim() : "",
+                            opts: {}
+                        };
+                        if (lbl && txt) cur.opts[lbl] = txt;
+                    }
+                });
+                if (cur) parsed.push(cur);
+                return parsed.map(item => {
+                    let labels = Object.keys(item.opts).sort();
+                    return buildQ(item.q, labels.map(l => item.opts[l]), item.ans, item.ana, item.type);
+                }).filter(x => x.question);
+            } else {
+                dataRows.forEach(row => {
+                    let q = String(row[cols.q] || "").trim();
+                    if (!q) return;
+                    let opts = isWide ? cols.optWide.map(i => String(row[i] || "").trim()).filter(o => o) : [];
+                    let ans = String(row[cols.ans] || "").trim();
+                    let ana = cols.ana !== -1 ? String(row[cols.ana] || "").trim() : "";
+                    let type = cols.type !== -1 ? String(row[cols.type] || "").trim() : "";
+                    parsed.push(buildQ(q, opts, ans, ana, type));
+                });
+                return parsed;
+            }
+        }
+
+        function buildQ(q, opts, ans, ana, type) {
+            if (opts.length === 0) {
+                if (/判断/.test(type) || /正确|错误|对|错|√|×/i.test(ans)) opts = ["正确", "错误"];
+                else opts = ["查看答案解析"];
+            }
+            return {
+                question: q, options: opts,
+                correctAnswers: parseAnswers(ans, opts.length),
+                analysis: ana || "暂无解析",
+                type: type || (opts.length > 2 ? "单选题" : "判断题")
+            };
+        }
+
+        function parseAnswers(ansStr, optCount) {
+            if (!ansStr) return [0];
+            ansStr = ansStr.trim().toUpperCase();
+            if (/正确|对|TRUE|√|T|Y/.test(ansStr)) return [0];
+            if (/错误|错|FALSE|×|F|N/.test(ansStr)) return [1];
+            let letters = ansStr.match(/[A-E]/g);
+            if (letters) return [...new Set(letters)].map(c => c.charCodeAt(0) - 65).filter(i => i < optCount);
+            let nums = ansStr.match(/[1-5]/g);
+            if (nums) return [...new Set(nums)].map(n => parseInt(n) - 1).filter(i => i < optCount);
+            return [0];
+        }
+
+        // ==========================================
+        // UI 渲染与交互逻辑
+        // ==========================================
+        function updateHistorySelect() {
+            historySelect.innerHTML = '<option>-- 请选择题库 --</option>';
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('quiz_')) {
+                    const opt = document.createElement('option');
+                    opt.value = key; opt.textContent = key.replace('quiz_', '');
+                    historySelect.appendChild(opt);
+                }
+            }
+        }
+        historySelect.addEventListener('change', (e) => {
+            if (e.target.value.startsWith('quiz_')) {
+                questions = JSON.parse(localStorage.getItem(e.target.value));
+                resetState(); renderQuestion();
+            }
+        });
+
+        function resetState() {
+            currentIndex = 0; userAnswers = questions.map(() => []);
+            confirmed = new Array(questions.length).fill(false);
+            incorrectHistory = []; correctCount = 0; incorrectCount = 0; isCompleted = false;
+            updateStats();
+        }
+
+        function renderQuestion() {
+            if (questions.length === 0) { placeholder.style.display = 'block'; quizArea.style.display = 'none'; completionScreen.style.display = 'none'; return; }
+            if (isCompleted) { placeholder.style.display = 'none'; quizArea.style.display = 'none'; completionScreen.style.display = 'block'; return; }
+            
+            placeholder.style.display = 'none'; completionScreen.style.display = 'none'; quizArea.style.display = 'block';
+            const q = questions[currentIndex];
+            const isMulti = q.correctAnswers.length > 1;
+            questionMeta.innerHTML = `<span class="badge">${q.type || (isMulti ? '多选题' : '单选题')}</span>${isMulti ? '<span class="badge multi">【多选题】</span>' : ''}`;
+            questionText.innerHTML = `${currentIndex + 1}. ${q.question}`;
+            optionsEl.innerHTML = '';
+            const labels = ['A', 'B', 'C', 'D', 'E', 'F'];
+            
+            q.options.forEach((opt, i) => {
+                const div = document.createElement('div');
+                div.className = 'option';
+                if (userAnswers[currentIndex].includes(i)) div.classList.add('selected');
+                if (confirmed[currentIndex]) {
+                    if (q.correctAnswers.includes(i)) div.classList.add('correct');
+                    else if (userAnswers[currentIndex].includes(i)) div.classList.add('wrong');
+                }
+                div.innerHTML = `<span class="option-label">${q.options.length === 1 && q.options[0] === '查看答案解析' ? '💡' : labels[i] + '.'}</span> ${opt}`;
+                div.onclick = () => selectOption(i);
+                optionsEl.appendChild(div);
+            });
+
+            if (confirmed[currentIndex]) { analysisText.innerHTML = q.analysis; analysisBox.classList.add('show'); } 
+            else { analysisBox.classList.remove('show'); }
+            updateStats();
+        }
+
+        function selectOption(index) {
+            if (confirmed[currentIndex]) return;
+            const isMulti = questions[currentIndex].correctAnswers.length > 1;
+            if (isMulti) {
+                let idx = userAnswers[currentIndex].indexOf(index);
+                if (idx > -1) userAnswers[currentIndex].splice(idx, 1);
+                else userAnswers[currentIndex].push(index);
+            } else {
+                userAnswers[currentIndex] = [index];
+            }
+            renderQuestion();
+        }
+
+        function confirmAnswer() {
+            if (questions.length === 0 || isCompleted || confirmed[currentIndex]) return;
+            if (userAnswers[currentIndex].length === 0) { showToast('请先选择一个选项！', 'error'); return; }
+            confirmed[currentIndex] = true;
+            const q = questions[currentIndex];
+            let u = [...userAnswers[currentIndex]].sort(), c = [...q.correctAnswers].sort();
+            if (JSON.stringify(u) === JSON.stringify(c)) correctCount++;
+            else {
+                incorrectCount++;
+                const labels = ['A','B','C','D','E'];
+                incorrectHistory.push({ index: currentIndex, question: q.question, options: q.options, userAns: u.map(i => labels[i]).join(','), correctAns: c.map(i => labels[i]).join(','), analysis: q.analysis });
+            }
+            renderQuestion();
+        }
+
+        function nextQuestion() {
+            if (questions.length === 0) return;
+            if (currentIndex < questions.length - 1) { currentIndex++; renderQuestion(); }
+            else if (confirmed[currentIndex] || userAnswers[currentIndex].length > 0) {
+                isCompleted = true;
+                document.getElementById('finalTotal').textContent = questions.length;
+                document.getElementById('finalCorrect').textContent = correctCount;
+                document.getElementById('finalWrong').textContent = incorrectCount;
+                renderQuestion();
+            }
+        }
+
+        function prevQuestion() { if (questions.length === 0) return; if (currentIndex > 0) { currentIndex--; renderQuestion(); } }
+        function updateStats() { progressEl.textContent = `${userAnswers.filter(a => a.length > 0).length}/${questions.length}`; correctEl.textContent = correctCount; wrongEl.textContent = incorrectCount; }
+
+        function toggleAnswerSheet() {
+            if (questions.length === 0) return;
+            const grid = document.getElementById('sheetGrid'); grid.innerHTML = '';
+            questions.forEach((q, i) => {
+                const div = document.createElement('div'); div.className = 'grid-item'; div.textContent = i + 1;
+                if (i === currentIndex) div.classList.add('current');
+                if (userAnswers[i].length > 0) {
+                    if (confirmed[i]) {
+                        let u = [...userAnswers[i]].sort(), c = [...q.correctAnswers].sort();
+                        if (JSON.stringify(u) !== JSON.stringify(c)) div.classList.add('wrong-item'); else div.classList.add('answered');
+                    } else div.classList.add('answered');
+                }
+                div.onclick = () => { currentIndex = i; isCompleted = false; renderQuestion(); closeModals(); };
+                grid.appendChild(div);
+            });
+            document.getElementById('sheetModal').classList.add('active');
+        }
+
+        function showIncorrectHistory() {
+            const list = document.getElementById('historyList'); list.innerHTML = '';
+            if (incorrectHistory.length === 0) list.innerHTML = '<p style="text-align:center; color:#999;">暂无错题</p>';
+            else {
+                incorrectHistory.forEach(item => {
+                    const div = document.createElement('div'); div.className = 'history-item';
+                    div.innerHTML = `<div class="history-q">${item.index + 1}. ${item.question}</div><div>你的答案: <span class="wrong-ans">${item.userAns}</span></div><div>正确答案: <span class="correct-ans">${item.correctAns}</span></div><div style="margin-top:5px; color:#666; font-size:14px;">解析: ${item.analysis}</div>`;
+                    list.appendChild(div);
+                });
+            }
+            document.getElementById('historyModal').classList.add('active');
+        }
+
+        function closeModals() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); }
+        function restartQuiz() { resetState(); isCompleted = false; renderQuestion(); }
+
+        // 快捷键
+        document.addEventListener('keydown', function(e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+            if (e.key === 'ArrowLeft') { e.preventDefault(); prevQuestion(); } 
+            else if (e.key === 'ArrowRight') { e.preventDefault(); nextQuestion(); } 
+            else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); confirmAnswer(); } 
+            else if (e.key === '1' || e.key.toLowerCase() === 'a') selectOption(0);
+            else if (e.key === '2' || e.key.toLowerCase() === 'b') selectOption(1);
+            else if (e.key === '3' || e.key.toLowerCase() === 'c') selectOption(2);
+            else if (e.key === '4' || e.key.toLowerCase() === 'd') selectOption(3);
+            else if (e.key === '5' || e.key.toLowerCase() === 'e') selectOption(4);
+            else if (e.key.toLowerCase() === 's') toggleAnswerSheet();
+            else if (e.key.toLowerCase() === 'h') showIncorrectHistory();
+            else if (e.key === 'Escape') closeModals();
+        });
+
+        updateHistorySelect();
+    </script>
+</body>
+</html>
