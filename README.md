@@ -5,12 +5,14 @@ Before this,  I had never learned anything related to HTML. Not long ago, I gave
 Secondly, as a college student, the excel format question bank cannot meet my needs. I thought of designing the question bank software through AI and HTML language.
 
 ## **Current implementation and Defects**<br>
- This html implements the practice of basic logic, for example, importing excel and parsing to generate HTML pages.
+ This HTML implements the practice of basic logic, for example, importing excel and **locally** parsing to generate HTML pages.
 
 ## **How to realize**<br>
-
+It is achieved by running an HTML file. You can access the instance through this [link](https://pic.luguang.top/html/database-of-test-v2.html) of mine or get the code run.
 
 
 ## **Future direction**<br>
+In the future, efforts will be gradually made to achieved AI integration and full layout excel question bank compatibility.
+
 
 
