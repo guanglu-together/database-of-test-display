@@ -9,10 +9,7 @@ Secondly, as a college student, the excel format question bank cannot meet my ne
 
 ## **How to realize**<br>
 It is achieved by running an HTML file. You can access the instance through this [link](https://pic.luguang.top/html/database-of-test-v2.html) of mine or get the code run.
-
+The **drawback** is that excel layout requires special requirements and is not compatible with all formats of layout. Excel layout examples can be viewed in folder "requirement".
 
 ## **Future direction**<br>
 In the future, efforts will be gradually made to achieved AI integration and full layout excel question bank compatibility.
-
-
-
